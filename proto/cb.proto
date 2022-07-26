@@ -1,0 +1,27 @@
+syntax = "proto3";
+package cb;
+
+service Inference {
+    rpc Predict(PredictRequest) returns (PredictResponse);
+}
+
+message PredictRequest {
+    repeated Features features = 1;
+}
+
+message Features {
+    float float_feature1 = 1;
+    float float_feature2 = 2;
+    string cat_feature1 = 3;
+    string cat_feature2 = 4;
+    string cat_feature3 = 5;
+}
+
+message PredictResponse {
+    repeated Prediction predictions = 1;
+    uint64 model_latency = 2;
+}
+
+message Prediction {
+    float score = 1;
+}
