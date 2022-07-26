@@ -1,7 +1,7 @@
-use std::env::args;
 use std::error::Error;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
+use std::{env, process};
 use tokio;
 
 pub mod cb {
@@ -14,11 +14,34 @@ const REPORT: usize = 100000;
 static GLOBAL: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[derive(Debug, Clone)]
-struct Params {
-    host: String,
+struct Config {
+    addr: String,
+    users: usize,
     b: usize,
     n: usize,
     timeout: u64,
+}
+
+impl Config {
+    fn new(args: &[String]) -> Result<Config, &'static str> {
+        if args.len() < 5 {
+            return Err("not enough arguments");
+        }
+
+        let addr = args[1].clone();
+        let users = args[2].parse().unwrap();
+        let b = args[3].parse().unwrap();
+        let n = args[4].parse().unwrap();
+        let timeout = args[5].parse().unwrap();
+
+        Ok(Config {
+            addr: addr,
+            users: users,
+            b: b,
+            n: n,
+            timeout: timeout,
+        })
+    }
 }
 
 #[derive(Default, Debug)]
@@ -38,9 +61,9 @@ impl User {
         Self { id }
     }
 
-    async fn execute(&mut self, params: &Params) -> Result<Metrics, Box<dyn Error>> {
+    async fn execute(&mut self, config: &Config) -> Result<Metrics, Box<dyn Error>> {
         let mut client =
-            cb::inference_client::InferenceClient::connect(params.host.clone()).await?;
+            cb::inference_client::InferenceClient::connect(config.addr.clone()).await?;
 
         let request = cb::PredictRequest {
             features: vec![
@@ -51,7 +74,7 @@ impl User {
                     cat_feature2: "B".to_string(),
                     cat_feature3: "C".to_string(),
                 };
-                params.b
+                config.b
             ],
         };
 
@@ -62,10 +85,10 @@ impl User {
 
         let mut report_start = Instant::now();
         let mut total_secs = 0.0f32;
-        let mut lat = vec![0u64; params.n];
-        let mut model_lat = vec![0u64; params.n];
+        let mut lat = vec![0u64; config.n];
+        let mut model_lat = vec![0u64; config.n];
 
-        for i in 1..params.n {
+        for i in 1..config.n {
             let start = Instant::now();
             let response = client.predict(request.clone()).await?.into_inner();
 
@@ -79,9 +102,9 @@ impl User {
                 log_stats(
                     ">Model",
                     i,
-                    params.n,
+                    config.n,
                     secs,
-                    params.timeout,
+                    config.timeout,
                     &model_lat,
                     i - REPORT,
                     REPORT,
@@ -89,9 +112,9 @@ impl User {
                 log_stats(
                     &self.id,
                     i,
-                    params.n,
+                    config.n,
                     secs,
-                    params.timeout,
+                    config.timeout,
                     &lat,
                     i - REPORT,
                     REPORT,
@@ -116,60 +139,39 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("========================================================================================================================================================");
     println!("Usage: cb-client http://host:port users batch_size iterations timeout_ms");
 
-    let host = args().nth(1).expect("http://host:port missing");
-    let users: usize = args()
-        .nth(2)
-        .expect("missing number users")
-        .parse()
-        .unwrap();
-    let b: usize = args()
-        .nth(3)
-        .expect("missing number batch_size")
-        .parse()
-        .unwrap();
-    let n: usize = args()
-        .nth(4)
-        .expect("missing number iterations")
-        .parse()
-        .unwrap();
-    let timeout: u64 = args().nth(5).expect("missing timeout_ms").parse().unwrap();
+    let args: Vec<String> = env::args().collect();
+
+    let config = Config::new(&args).unwrap_or_else(|err| {
+        println!("Problem parsing arguments: {}", err);
+        process::exit(1);
+    });
 
     println!(
         "Host:{} Users:{} BatchSize:{} Iterations:{} Timeout:{}",
-        host.clone(),
-        users,
-        b,
-        n,
-        timeout
+        config.addr, config.users, config.b, config.n, config.timeout
     );
     println!("========================================================================================================================================================");
 
-    let params = Params {
-        host,
-        b,
-        n,
-        timeout,
-    };
     let (tx, rx) = mpsc::channel::<Metrics>();
     let start = Instant::now();
 
-    for u in 0..users {
-        let params = params.clone();
+    for u in 0..config.users {
+        let config = config.clone();
         let tx = tx.clone();
         let id = format!("User{:0>2}", u);
 
         tokio::spawn(async move {
             let metrics = User::new(id.clone())
-                .execute(&params)
+                .execute(&config)
                 .await
                 .expect("ERROR!");
-            report(&id, 1, &params, &metrics);
+            report(&id, 1, &config, &metrics);
             tx.send(metrics).unwrap();
         });
     }
 
     let mut metrics = Metrics::default();
-    for _ in 0..users {
+    for _ in 0..config.users {
         let result = rx.recv().unwrap();
 
         metrics.lat.extend(result.lat.iter());
@@ -178,7 +180,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     tokio::time::sleep(Duration::from_secs(1)).await;
-    report("TEST  ", users, &params, &metrics);
+    report("TEST  ", config.users, &config, &metrics);
 
     Ok(())
 }
@@ -238,27 +240,27 @@ fn percentiles(ps: Vec<f64>, latencies: &Vec<u64>, skip: usize, take: usize) -> 
         .collect()
 }
 
-fn report(id: &str, users: usize, params: &Params, metrics: &Metrics) {
+fn report(id: &str, users: usize, config: &Config, metrics: &Metrics) {
     println!("REPORT =================================================================================================================================================");
     log_stats(
         ">Model",
-        users * params.n,
-        users * params.n,
+        users * config.n,
+        users * config.n,
         metrics.total_secs,
-        params.timeout,
+        config.timeout,
         &metrics.model_lat,
         0,
-        users * params.n,
+        users * config.n,
     );
     log_stats(
         &id,
-        users * params.n,
-        users * params.n,
+        users * config.n,
+        users * config.n,
         metrics.total_secs,
-        params.timeout,
+        config.timeout,
         &metrics.lat,
         0,
-        users * params.n,
+        users * config.n,
     );
     println!("========================================================================================================================================================");
 }
