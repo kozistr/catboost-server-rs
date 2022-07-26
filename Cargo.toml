@@ -1,0 +1,31 @@
+[package]
+name = "catboost-server"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]] # Bin to run the HelloWorld gRPC server
+name = "cb-server"
+path = "src/server.rs"
+
+[[bin]] # Bin to run the HelloWorld gRPC client
+name = "cb-client"
+path = "src/client.rs"
+
+[dependencies]
+tonic = "0.7.2"
+prost = "0.10.4"
+tokio = { version = "1.20.0", features = ["macros", "rt-multi-thread"] }
+catboost = { git = "https://github.com/catboost/catboost" }
+log = "*"
+jemallocator = "0.5.0"
+
+[build-dependencies]
+tonic-build = "0.7.2"
+
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = "fat"
+panic = "abort"
