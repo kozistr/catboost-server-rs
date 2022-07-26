@@ -1,11 +1,11 @@
 use tonic::{transport::Server, Request, Response, Status};
 
+mod predict;
+use predict::predict;
+
 pub mod cb {
     tonic::include_proto!("cb");
 }
-
-mod predict;
-use predict::predict;
 
 #[derive(Debug, Default)]
 pub struct CatboostInferenceService {}
