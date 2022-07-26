@@ -26,9 +26,9 @@ $ cargo run --release --bin cb-client http://127.0.0.1:50051 1 32 100000 10
 
 ## Performance
 
-% timeout : 10ms
-% latency : ms / req
-% warm up with 10 times
+* timeout : 10ms
+* latency : ms / req
+* warm up with 10 times
 
 | batch size | requests | mean | p95 | p99 | p99.9 | max | timeouts |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
