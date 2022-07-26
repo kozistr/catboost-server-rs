@@ -25,3 +25,7 @@ $ cargo run --release --bin cb-client http://127.0.0.1:50051 1 32 100000 10
 | 64 | 100k | | | | | | |
 | 128 | 100k | | | | | | |
 | 256 | 100k | | | | | | |
+
+## Reference
+
+* https://github.com/leosmerling/catboost_inference/tree/main/rust/grpc-server
