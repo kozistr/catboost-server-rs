@@ -136,7 +136,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         tokio::spawn(async move {
             let metrics = execute(&config).await.expect("ERROR!");
-            report(&config, &metrics);
             tx.send(metrics).unwrap();
         });
     }
