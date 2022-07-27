@@ -20,8 +20,8 @@ $ cargo run --release --bin cb-server
 ### gRPC Client
 
 ```shell
-# binary http://host:port num_users batch_size iterations timeout
-$ cargo run --release --bin cb-client http://127.0.0.1:50051 1 32 100000 10
+# binary http://host:port batch_size iterations timeout
+$ cargo run --release --bin cb-client http://127.0.0.1:50051 32 100000 10
 ```
 
 ## Performance
