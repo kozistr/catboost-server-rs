@@ -1,4 +1,4 @@
-# catboost-server
+# catboost-server-rs
 
 CatBoost server in Rust + gRPC
 
